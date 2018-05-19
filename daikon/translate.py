@@ -31,14 +31,6 @@ def load_vocabs(load_from: str) -> Tuple[vocab.Vocabulary, vocab.Vocabulary]:
     target_vocab.load(os.path.join(load_from, C.TARGET_VOCAB_FILENAME))
 
     return source_vocab, target_vocab
-    
-    
-def softmax(ndarray):
-    """
-    I had a little help from here: 
-    https://stackoverflow.com/questions/34968722/how-to-implement-the-softmax-function-in-python
-    """
-    return np.exp(ndarray) / np.sum(np.exp(ndarray), axis=0)
 
 
 def translate_line(session: tf.Session,
@@ -130,6 +122,8 @@ def translate_line(session: tf.Session,
                     # after finding, we delete the element
                     next_symbol_logits = np.delete(next_symbol_logits, next_id)
                     
+                print("POTENTIAL NEXTS", potential_next_ids)
+                    
                 for new_id in potential_next_ids:
                     #print(sent)
                     #print(new_id)
@@ -143,7 +137,7 @@ def translate_line(session: tf.Session,
             sent_dict = {}
             # decide which k sentences are taken
             potential_sentences = sorted(potential_sentences.items(), reverse=True)[:k]
-            #print("POTENTIAL:", potential_sentences)
+            print("CHOSEN:", potential_sentences)
             for val, sent in potential_sentences:
                 #print(sent)
                 # if ending in <EOS>, add to finished
