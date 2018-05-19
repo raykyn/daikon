@@ -89,6 +89,9 @@ def translate_line(session: tf.Session,
                 potential_next_ids.append((next_id, next_id_value))
                 # after finding, we delete the element
                 next_symbol_logits = np.delete(next_symbol_logits, next_id)
+                
+            print("POTENTIAL NEXTS", potential_next_ids)
+            print(target_vocab.get_words([x[0] for x in potential_next_ids]))
                
             #print("POTENTIAL START", potential_next_ids)
  
@@ -123,6 +126,7 @@ def translate_line(session: tf.Session,
                     next_symbol_logits = np.delete(next_symbol_logits, next_id)
                     
                 print("POTENTIAL NEXTS", potential_next_ids)
+                print(target_vocab.get_words([x[0] for x in potential_next_ids]))
                     
                 for new_id in potential_next_ids:
                     #print(sent)
