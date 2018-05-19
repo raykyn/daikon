@@ -55,12 +55,14 @@ def translate_line(session: tf.Session,
 
     source_ids = np.array(source_vocab.get_ids(line.split())).reshape(1, -1)
 
+    print(line)
+
     # instead of one list, we have a dictionary of float : list pairs
     # the float is always equal to the probability of this sentence
     #~ translated_ids = []  # type: List[int]
     
     # num of beams
-    k = 2
+    k = 5
     
     # new list of finished translations
     sent_dict = {}
@@ -85,24 +87,27 @@ def translate_line(session: tf.Session,
                          decoder_targets: target_ids}
             logits_result = session.run([decoder_logits], feed_dict=feed_dict)
             
-            next_symbol_logits = logits_result[0][0][-1]
+            next_symbol_logits = softmax(logits_result[0][0][-1])
             
             potential_next_ids = []
-            sum_of_logits = np.sum(next_symbol_logits)
+            
             for __ in range(k):
                 next_id = np.argmax(next_symbol_logits)
-                next_id_value = (next_symbol_logits[next_id]/sum_of_logits)
-                potential_next_ids.append((next_id, next_id_val))
+                next_id_value = next_symbol_logits[next_id]
+                potential_next_ids.append((next_id, next_id_value))
                 # after finding, we delete the element
-                np.delete(next_symbol_logits, next_id)
-                
+                next_symbol_logits = np.delete(next_symbol_logits, next_id)
+               
+            #print("POTENTIAL START", potential_next_ids)
+ 
             for new_id in potential_next_ids:
                 if new_id not in [C.EOS_ID, C.PAD_ID]:
-                    sent_dict[[new_id[1]]] = new_id[0]
+                    sent_dict[new_id[1]] = (new_id[0],)
+            print("START", sent_dict)
                 
         else:
             for prob, sent in sent_dict.items():
-                target_ids = np.array([C.BOS_ID] + sent).reshape(1, -1)
+                target_ids = np.array([C.BOS_ID] + list(sent)).reshape(1, -1)
 
                 feed_dict = {encoder_inputs: source_ids,
                              decoder_inputs: target_ids,
@@ -117,24 +122,30 @@ def translate_line(session: tf.Session,
                 # till k highest have been found.
                 #~ next_id = np.argmax(next_symbol_logits)
                 potential_next_ids = []
-                sum_of_logits = np.sum(next_symbol_logits)
+                
                 for __ in range(k):
                     next_id = np.argmax(next_symbol_logits)
-                    next_id_value = (next_symbol_logits[next_id]/sum_of_logits)
-                    potential_next_ids.append((next_id, next_id_val))
+                    next_id_value = next_symbol_logits[next_id]
+                    potential_next_ids.append((next_id, next_id_value))
                     # after finding, we delete the element
-                    np.delete(next_symbol_logits, next_id)
+                    next_symbol_logits = np.delete(next_symbol_logits, next_id)
                     
                 for new_id in potential_next_ids:
-                    new_sent = sent + new_id[0]
+                    #print(sent)
+                    #print(new_id)
+                    new_sent = list(sent)
+                    new_sent.append(new_id[0])
+                    #print(new_sent)
                     new_value = prob * new_id[1]
                     potential_sentences[new_value] = new_sent
             
             # clear sent dict for the next loop
             sent_dict = {}
             # decide which k sentences are taken
-            potential_sentences = sorted(potential_sentences, reverse=True)[:5]
-            for val, sent in potential_sentences.items():
+            potential_sentences = sorted(potential_sentences.items(), reverse=True)[:k]
+            #print("POTENTIAL:", potential_sentences)
+            for val, sent in potential_sentences:
+                #print(sent)
                 # if ending in <EOS>, add to finished
                 if sent[-1] in [C.EOS_ID, C.PAD_ID]:
                     finished_sent_dict[val] = sent
@@ -142,6 +153,8 @@ def translate_line(session: tf.Session,
                 # else continue
                 else:
                     sent_dict[val] = sent
+
+            #print("CHOSEN", sent_dict)
                                 
     # normalize the remaining sentences by length-alpha
     norm_dict = {}
@@ -149,10 +162,16 @@ def translate_line(session: tf.Session,
         val = np.log10(val) / len(sent)**0.65
         norm_dict[val] = sent
     
+    #print("LEN_NORM", norm_dict)
+
     # only return our best translation
     best_sent = sorted(norm_dict.items(), reverse=True)[0][1]
+    
+    #print("BEST", best_sent)
 
     words = target_vocab.get_words(best_sent)
+
+    print("WORDS", words)
 
     return ' '.join(words)
 
