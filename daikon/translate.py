@@ -31,6 +31,14 @@ def load_vocabs(load_from: str) -> Tuple[vocab.Vocabulary, vocab.Vocabulary]:
     target_vocab.load(os.path.join(load_from, C.TARGET_VOCAB_FILENAME))
 
     return source_vocab, target_vocab
+    
+    
+def softmax(ndarray):
+    """
+    I had a little help from here: 
+    https://stackoverflow.com/questions/34968722/how-to-implement-the-softmax-function-in-python
+    """
+    return np.exp(ndarray) / np.sum(np.exp(ndarray), axis=0)
 
 
 def translate_line(session: tf.Session,
@@ -47,29 +55,104 @@ def translate_line(session: tf.Session,
 
     source_ids = np.array(source_vocab.get_ids(line.split())).reshape(1, -1)
 
-    translated_ids = []  # type: List[int]
+    # instead of one list, we have a dictionary of float : list pairs
+    # the float is always equal to the probability of this sentence
+    #~ translated_ids = []  # type: List[int]
+    
+    # num of beams
+    k = 2
+    
+    # new list of finished translations
+    sent_dict = {}
+    
+    finished_sent_dict = {}
 
     for _ in range(C.TRANSLATION_MAX_LEN):
 
         # target ids will serve as decoder inputs and decoder targets,
         # but decoder targets will not be used to compute logits
-        target_ids = np.array([C.BOS_ID] + translated_ids).reshape(1, -1)
-
-        feed_dict = {encoder_inputs: source_ids,
-                     decoder_inputs: target_ids,
-                     decoder_targets: target_ids}
-        logits_result = session.run([decoder_logits], feed_dict=feed_dict)
-
-        # first session result, first item in batch, target symbol at last position
-        next_symbol_logits = logits_result[0][0][-1]
-        next_id = np.argmax(next_symbol_logits)
-
-        if next_id in [C.EOS_ID, C.PAD_ID]:
+        
+        potential_sentences = {}
+        
+        if k == 0:
             break
+        
+        if len(sent_dict) == 0:
+            target_ids = np.array([C.BOS_ID]).reshape(1, -1)
+            
+            feed_dict = {encoder_inputs: source_ids,
+                         decoder_inputs: target_ids,
+                         decoder_targets: target_ids}
+            logits_result = session.run([decoder_logits], feed_dict=feed_dict)
+            
+            next_symbol_logits = logits_result[0][0][-1]
+            
+            potential_next_ids = []
+            sum_of_logits = np.sum(next_symbol_logits)
+            for __ in range(k):
+                next_id = np.argmax(next_symbol_logits)
+                next_id_value = (next_symbol_logits[next_id]/sum_of_logits)
+                potential_next_ids.append((next_id, next_id_val))
+                # after finding, we delete the element
+                np.delete(next_symbol_logits, next_id)
+                
+            for new_id in potential_next_ids:
+                if new_id not in [C.EOS_ID, C.PAD_ID]:
+                    sent_dict[[new_id[1]]] = new_id[0]
+                
+        else:
+            for prob, sent in sent_dict.items():
+                target_ids = np.array([C.BOS_ID] + sent).reshape(1, -1)
 
-        translated_ids.append(next_id)
+                feed_dict = {encoder_inputs: source_ids,
+                             decoder_inputs: target_ids,
+                             decoder_targets: target_ids}
+                logits_result = session.run([decoder_logits], feed_dict=feed_dict)
 
-    words = target_vocab.get_words(translated_ids)
+                # first session result, first item in batch, target symbol at last position
+                next_symbol_logits = softmax(logits_result[0][0][-1])
+                # 1. change:
+                # retrieve k number of highest elements
+                # loop argmax, everytime the highest has been found, delete it and argmax again
+                # till k highest have been found.
+                #~ next_id = np.argmax(next_symbol_logits)
+                potential_next_ids = []
+                sum_of_logits = np.sum(next_symbol_logits)
+                for __ in range(k):
+                    next_id = np.argmax(next_symbol_logits)
+                    next_id_value = (next_symbol_logits[next_id]/sum_of_logits)
+                    potential_next_ids.append((next_id, next_id_val))
+                    # after finding, we delete the element
+                    np.delete(next_symbol_logits, next_id)
+                    
+                for new_id in potential_next_ids:
+                    new_sent = sent + new_id[0]
+                    new_value = prob * new_id[1]
+                    potential_sentences[new_value] = new_sent
+            
+            # clear sent dict for the next loop
+            sent_dict = {}
+            # decide which k sentences are taken
+            potential_sentences = sorted(potential_sentences, reverse=True)[:5]
+            for val, sent in potential_sentences.items():
+                # if ending in <EOS>, add to finished
+                if sent[-1] in [C.EOS_ID, C.PAD_ID]:
+                    finished_sent_dict[val] = sent
+                    k -= 1
+                # else continue
+                else:
+                    sent_dict[val] = sent
+                                
+    # normalize the remaining sentences by length-alpha
+    norm_dict = {}
+    for val, sent in finished_sent_dict.items():
+        val = np.log10(val) / len(sent)**0.65
+        norm_dict[val] = sent
+    
+    # only return our best translation
+    best_sent = sorted(norm_dict.items(), reverse=True)[0][1]
+
+    words = target_vocab.get_words(best_sent)
 
     return ' '.join(words)
 
