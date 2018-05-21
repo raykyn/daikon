@@ -1,0 +1,40 @@
+Bericht Übung 5 von Ismail Prada
+===============
+
+Hyperparameter: Unverändert
+
+Änderungen am Preprocessing:
+- 100'000 statt 50'000 BPE-Symbole
+- Gemeinsames BPE-Modell 
+    (Ich habe aber vergessen, tied weights zu implementieren.
+    Der Punkt, an dem ich das bemerkt habe, war schliesslich schon zu spät
+    um das Modell neu zu berechnen. Daher habe ich trotzdem auf der Basis 
+    gearbeitet)
+    
+Keine Änderungen am Training/Encoding (Kein Zeit für Testing)
+
+Änderung am Decoding:
+- Implementation von Beam-Search (Im Moment mit k=5)
+
+Resultate:
+Auf dem Dev-Set waren die BLEU-Resultate schlechter als die Baseline.
+Da ich nicht annehme, dass die Beam-Search zu einer Verschlechterung
+geführt hat, nehme ich an, dass mein Fehler im Preprocessing dazu geführt
+hat. Wäre mehr Zeit, hätte ich sehr gerne noch ein Modell trainiert mit
+den ursprnglichen BPE-Symbolen um zu sehen, wie viel die Beam-Search 
+tatsächlich bewirkt.
+Ich habe mich aber ohnehin gefragt, ob unser Übung1-Skript für die
+Berechnung des BLEU-Scores geeignet ist, da es den Text als ganzes bewertet
+und nicht Zeile für Zeile (wie ich es jetzt angenommen hätte).
+
+Die übersetzte Test-Datei findet sich unter "trans.test.norm.en.noeos"
+(noeos, da ich die <eos>-Tags noch im Nachhinein entfernen musste =>
+    sed 's/<eos>//g')
+
+
+Feedback:
+Wenn diese Übung im nächsten Jahr wiederum zum Einsatz kommt, dann würde ich
+definitiv mehr Zeit anbieten (3 Wochen, dafür Übung 5 nur 2 Wochen) und
+Gruppen unter den Studis forcieren, damit die GPUs nicht so stark besetzt sind.
+Insgesamt aber toll, die Möglichkeit auf den Google Servern zu arbeiten mal
+gehabt zu haben.
