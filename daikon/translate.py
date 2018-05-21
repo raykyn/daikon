@@ -47,7 +47,7 @@ def translate_line(session: tf.Session,
 
     source_ids = np.array(source_vocab.get_ids(line.split())).reshape(1, -1)
 
-    print(line)
+    #print(line)
 
     # instead of one list, we have a dictionary of float : list pairs
     # the float is always equal to the probability of this sentence
@@ -90,15 +90,15 @@ def translate_line(session: tf.Session,
                 # after finding, we delete the element
                 next_symbol_logits = np.delete(next_symbol_logits, next_id)
                 
-            print("POTENTIAL NEXTS", potential_next_ids)
-            print(target_vocab.get_words([x[0] for x in potential_next_ids]))
+            #print("POTENTIAL NEXTS", potential_next_ids)
+            #print(target_vocab.get_words([x[0] for x in potential_next_ids]))
                
             #print("POTENTIAL START", potential_next_ids)
  
             for new_id in potential_next_ids:
                 if new_id not in [C.EOS_ID, C.PAD_ID]:
                     sent_dict[new_id[1]] = (new_id[0],)
-            print("START", sent_dict)
+            #print("START", sent_dict)
                 
         else:
             for prob, sent in sent_dict.items():
@@ -125,8 +125,8 @@ def translate_line(session: tf.Session,
                     # after finding, we delete the element
                     next_symbol_logits = np.delete(next_symbol_logits, next_id)
                     
-                print("POTENTIAL NEXTS", potential_next_ids)
-                print(target_vocab.get_words([x[0] for x in potential_next_ids]))
+                #print("POTENTIAL NEXTS", potential_next_ids)
+                #print(target_vocab.get_words([x[0] for x in potential_next_ids]))
                     
                 for new_id in potential_next_ids:
                     #print(sent)
@@ -141,7 +141,7 @@ def translate_line(session: tf.Session,
             sent_dict = {}
             # decide which k sentences are taken
             potential_sentences = sorted(potential_sentences.items(), reverse=True)[:k]
-            print("CHOSEN:", potential_sentences)
+            #print("CHOSEN:", potential_sentences)
             for val, sent in potential_sentences:
                 #print(sent)
                 # if ending in <EOS>, add to finished
@@ -157,19 +157,25 @@ def translate_line(session: tf.Session,
     # normalize the remaining sentences by length-alpha
     norm_dict = {}
     for val, sent in finished_sent_dict.items():
-        val = np.log10(val) / len(sent)**0.65
-        norm_dict[val] = sent
+        if len(sent) > 0:
+            val = np.log10(val) / len(sent)**0.65
+            norm_dict[val] = sent
     
     #print("LEN_NORM", norm_dict)
 
     # only return our best translation
-    best_sent = sorted(norm_dict.items(), reverse=True)[0][1]
-    
+    try:
+        best_sent = sorted(norm_dict.items(), reverse=True)[0][1]
+    except:
+        print("empty line...")
+        print(norm_dict)
+        best_sent = []    
+
     #print("BEST", best_sent)
 
     words = target_vocab.get_words(best_sent)
 
-    print("WORDS", words)
+    #print("WORDS", words)
 
     return ' '.join(words)
 
